@@ -60,11 +60,19 @@ class Annotation(models.Model):
     def __str__(self):
         return self.name
 
+
+class ExtraInfoManager(models.Manager):
+    #refer to ticket 20927
+    use_for_related_fields = True
+
+
 @python_2_unicode_compatible
 class ExtraInfo(models.Model):
     info = models.CharField(max_length=100)
     note = models.ForeignKey(Note)
     value = models.IntegerField(null=True)
+
+    objects = ExtraInfoManager()
 
     class Meta:
         ordering = ['info']

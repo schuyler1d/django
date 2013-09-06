@@ -2578,6 +2578,20 @@ class IteratorExceptionsTest(TestCase):
         self.assertRaises(FieldError, list, qs)
 
 
+class OnlyQueryTest(TestCase):
+    def setUp(self):
+        self.n1 = Note.objects.create(note='asdf', misc='asdf')
+        self.e1 = ExtraInfo.objects.create(note=self.n1,
+                                           value=1, info='1')
+
+    def test_ticket20927(self):
+        """confirm that calling only() on object won't break
+        with a use_for_related_fields in manager
+        """
+        self.assertEqual(ExtraInfo.objects.only('info')[0].info,
+                         '1')
+
+
 class NullJoinPromotionOrTest(TestCase):
     def setUp(self):
         self.d1 = ModelD.objects.create(name='foo')
