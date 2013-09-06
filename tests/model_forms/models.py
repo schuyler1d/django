@@ -204,6 +204,15 @@ class BookXtra(models.Model):
         unique_together = (('suffix1', 'suffix2'))
         abstract = True
 
+
+class BookXtraLarge(models.Model):
+    height = models.IntegerField(default=0)
+    oversized = models.BooleanField()
+
+    class Meta:
+        abstract = True
+
+
 class DerivedBook(Book, BookXtra):
     pass
 

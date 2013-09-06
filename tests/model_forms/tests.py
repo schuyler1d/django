@@ -18,7 +18,7 @@ from django.test import TestCase
 from django.utils import six
 
 from .models import (Article, ArticleStatus, BetterWriter, BigInt, Book,
-    Category, CommaSeparatedInteger, CustomFieldForExclusionModel, DerivedBook,
+    BookXtraLarge, Category, CommaSeparatedInteger, CustomFieldForExclusionModel, DerivedBook,
     DerivedPost, ExplicitPK, FlexibleDatePost, ImprovedArticle,
     ImprovedArticleWithParentLink, Inventory, Post, Price,
     Product, TextFile, Writer, WriterProfile, Colour, ColourfulItem,
@@ -61,6 +61,14 @@ class DerivedBookForm(forms.ModelForm):
         model = DerivedBook
         fields = '__all__'
 
+
+class XtraLargeBookForm(forms.ModelForm):
+    author_email = forms.EmailField(
+        error_messages = {'invalid':  u'Please enter a valid email address.'})
+
+    class Meta:
+        model = BookXtraLarge
+        fields = '__all__'
 
 
 class ExplicitPKForm(forms.ModelForm):
@@ -668,6 +676,17 @@ class UniqueTest(TestCase):
         self.assertFalse(form.is_valid())
         self.assertEqual(len(form.errors), 1)
         self.assertEqual(form.errors['__all__'], ['Book with this Title and Author already exists.'])
+
+    def test_abstract_validation(self):
+        form = XtraLargeBookForm({'oversized': 0, 'height': '10', 'author_email': 'hi@example.com'})
+        self.assertTrue(form.is_valid())
+        form = XtraLargeBookForm({'oversized': 0, 'height': 'not_a_number',
+                                  'author_email': 'hi@example.com'})
+        self.assertFalse(form.is_valid())
+        form = XtraLargeBookForm({'oversized': 0, 'height': '10', 'author_email': 'noAtSignnoNothin'})
+        self.assertFalse(form.is_valid())
+        self.assertEqual(form.errors['author_email'][0],
+                         u'Please enter a valid email address.')
 
     def test_abstract_inherited_unique(self):
         title = 'Boss'
