@@ -209,9 +209,10 @@ class EmailMessage(object):
     mixed_subtype = 'mixed'
     encoding = None     # None => use settings default
 
-    #@method_decorator(uses_settings('DEFAULT_FROM_EMAIL', 'from_email', None))
+    @method_decorator(uses_settings({'DEFAULT_FROM_EMAIL': ['from_email', None],
+                                     'DEFAULT_CHARSET': ['encoding']}))
     def __init__(self, subject='', body='', from_email=None, to=None, bcc=None,
-                 connection=None, attachments=None, headers=None, cc=None):
+                 connection=None, attachments=None, headers=None, cc=None, encoding=None):
         """
         Initialize a single email message (which can be sent to multiple
         recipients).
@@ -235,12 +236,13 @@ class EmailMessage(object):
             self.bcc = list(bcc)
         else:
             self.bcc = []
-        self.from_email = from_email or settings.DEFAULT_FROM_EMAIL
+        self.from_email = from_email
         self.subject = subject
         self.body = body
         self.attachments = attachments or []
         self.extra_headers = headers or {}
         self.connection = connection
+        self.encoding = encoding
 
     def get_connection(self, fail_silently=False):
         from django.core.mail import get_connection
@@ -248,8 +250,8 @@ class EmailMessage(object):
             self.connection = get_connection(fail_silently=fail_silently)
         return self.connection
 
-    def message(self):
-        encoding = self.encoding or settings.DEFAULT_CHARSET
+    def message(self, encoding=None):
+        encoding = encoding or self.encoding or settings.DEFAULT_CHARSET
         msg = SafeMIMEText(self.body, self.content_subtype, encoding)
         msg = self._create_message(msg)
         msg['Subject'] = self.subject

@@ -4,11 +4,9 @@ import inspect
 from django.conf import settings
 
 """
-
 This is an incremental project to remove settings dependencies from Django
 libraries so that Django core libraries can be imported without a settings
-file or initialization
-
+file or initialization.
 """
 
 OVERWRITE_SENTINEL = 'FAKE_VALUE'
@@ -60,11 +58,12 @@ def uses_settings(setting_name_or_dict, kw_arg=None, fallback_trigger_value=OVER
 
         def _wrapper(*args, **kwargs):
             new_kwargs = kwargs.copy()
-                                   
+            max_args_index = 1000
             for counter, arg in enumerate(arg_names):
                 try:
                     # First, see if it is set positionally...
                     new_kwargs[arg] = args[counter]
+                    max_args_index = min(max_args_index, counter)
                 except IndexError:
                     if not kwargs.has_key(arg):
                         if arg in setting_map:
@@ -78,7 +77,7 @@ def uses_settings(setting_name_or_dict, kw_arg=None, fallback_trigger_value=OVER
                         and new_kwargs[arg] == setting_map[arg].fallback_trigger_value:
                     new_kwargs[arg] = getattr(settings, setting_map[arg].setting)
 
-            return func(**new_kwargs)
+            return func(*args[:max_args_index], **new_kwargs)
         update_wrapper(_wrapper, func)
         return _wrapper
     return _dec
