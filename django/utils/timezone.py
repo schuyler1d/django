@@ -13,7 +13,7 @@ except ImportError:
     pytz = None
 
 from django.utils import six
-from django.utils.unsetting import use_setting
+from django.utils.unsetting import uses_settings
 
 __all__ = [
     'utc', 'get_default_timezone', 'get_current_timezone',
@@ -99,7 +99,7 @@ utc = pytz.utc if pytz else UTC()
 # wrap the expression in a function and cache the result.
 _localtime = None
 
-@use_setting('TIME_ZONE', 'timezone')
+@uses_settings('TIME_ZONE', 'timezone')
 def get_default_timezone(timezone=None):
     """
     Returns the default time zone as a tzinfo instance.
@@ -208,7 +208,7 @@ class override(object):
 
 # Templates
 
-@use_setting('USE_TZ', 'use_tz', overwrite_default=None)
+@uses_settings('USE_TZ', 'use_tz', overwrite_default=None)
 def template_localtime(value, use_tz=None):
     """
     Checks if value is a datetime and converts it to local time if necessary.
@@ -242,7 +242,7 @@ def localtime(value, timezone=None):
         value = timezone.normalize(value)
     return value
 
-@use_setting('USE_TZ', 'use_tz', overwrite_default=None)
+@uses_settings('USE_TZ', 'use_tz', overwrite_default=None)
 def now(use_tz=None):
     """
     Returns an aware or naive datetime.datetime, depending on settings.USE_TZ.

@@ -1,5 +1,9 @@
-from django.conf import settings
+from functools import update_wrapper
 import inspect
+
+from django.conf import settings
+from django.utils import decorators
+
 """
 
 This is an incremental project to remove settings dependencies from Django
@@ -20,7 +24,10 @@ class SettingDetails():
         self.overwrite_default = (setting_list[1] 
                                   if len(setting_list) > 1
                                   else OVERWRITE_SENTINEL)
-        self.index = arg_names.index(self.arg)
+        try:
+            self.index = arg_names.index(self.arg)
+        except ValueError:
+            self.index = None
 
         if self.arg not in arg_names:
             raise ValueError("Decorator keyword argument, "
@@ -29,7 +36,8 @@ class SettingDetails():
     def __repr__(self):
         return str([self.arg, self.index, self.overwrite_default])
 
-def use_setting(setting_name_or_dict, kw_arg=None, overwrite_default=OVERWRITE_SENTINEL):
+
+def uses_settings(setting_name_or_dict, kw_arg=None, overwrite_default=OVERWRITE_SENTINEL):
     """
     Decorator for functions
     :param setting_name_or_dict: setting attribute, e.g. 'USE_TZ'.  
@@ -63,14 +71,10 @@ def use_setting(setting_name_or_dict, kw_arg=None, overwrite_default=OVERWRITE_S
                     # First, see if it is set positionally...
                     new_kwargs[arg] = args[counter]
                 except IndexError:
-                    # ...if not, maybe it's an explicit kwarg...
-                    try:
-                        # Otherwise, the kwarg is good enough for us.
-                        new_kwargs[arg] = kwargs[arg]
-                    except KeyError:
-                        # ...nope - it must be a default.
+                    if not kwargs.has_key(arg):
                         if arg in setting_map:
-                            new_kwargs[arg] = getattr(settings, setting_map[arg].setting)
+                            new_kwargs[arg] = getattr(settings,
+                                                      setting_map[arg].setting)
                         else:
                             position = len(args) - counter
                             new_kwargs[arg] = kw_defaults[position]
@@ -80,5 +84,9 @@ def use_setting(setting_name_or_dict, kw_arg=None, overwrite_default=OVERWRITE_S
                     new_kwargs[arg] = getattr(settings, setting_map[arg].setting)
 
             return func(**new_kwargs)
+        update_wrapper(_wrapper, func)
         return _wrapper
     return _dec
+
+uses_settings_m = decorators.method_decorator(uses_settings)
+

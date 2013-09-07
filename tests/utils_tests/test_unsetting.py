@@ -1,12 +1,12 @@
 import unittest
 from django.test.utils import override_settings
-from django.utils.unsetting import use_setting
+from django.utils.unsetting import uses_settings
 
 
 class UnsettingTests(unittest.TestCase):
-    def test_use_setting_decorator(self):
+    def test_uses_settings_decorator(self):
         with override_settings(USE_TZ=True):
-            @use_setting('USE_TZ', 'use_tz')
+            @uses_settings('USE_TZ', 'use_tz')
             def foo(use_tz=None):
                 return use_tz
             self.assertTrue(foo())
@@ -15,9 +15,9 @@ class UnsettingTests(unittest.TestCase):
             self.assertEqual(foo(1), 1)
             self.assertEqual(foo(use_tz=2), 2)
 
-    def test_use_setting_fallback(self):
+    def test_uses_settings_fallback(self):
         with override_settings(USE_TZ=True):
-            @use_setting('USE_TZ', 'use_tz', overwrite_default=None)
+            @uses_settings('USE_TZ', 'use_tz', overwrite_default=None)
             def foo(use_tz=None):
                 return use_tz
             self.assertTrue(foo())

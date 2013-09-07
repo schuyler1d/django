@@ -859,7 +859,7 @@ class SMTPBackendTests(BaseEmailBackendTests, SimpleTestCase):
 
     @override_settings(EMAIL_HOST_USER="not empty username",
                         EMAIL_HOST_PASSWORD="not empty password")
-    def test_email_authentication_use_settings(self):
+    def test_email_authentication_uses_settingss(self):
         backend = smtp.EmailBackend()
         self.assertEqual(backend.username, 'not empty username')
         self.assertEqual(backend.password, 'not empty password')
@@ -892,7 +892,7 @@ class SMTPBackendTests(BaseEmailBackendTests, SimpleTestCase):
             self.fail("close() unexpectedly raised an exception: %s" % e)
 
     @override_settings(EMAIL_USE_TLS=True)
-    def test_email_tls_use_settings(self):
+    def test_email_tls_uses_settingss(self):
         backend = smtp.EmailBackend()
         self.assertTrue(backend.use_tls)
 
@@ -906,7 +906,7 @@ class SMTPBackendTests(BaseEmailBackendTests, SimpleTestCase):
         self.assertFalse(backend.use_tls)
 
     @override_settings(EMAIL_USE_SSL=True)
-    def test_email_ssl_use_settings(self):
+    def test_email_ssl_uses_settingss(self):
         backend = smtp.EmailBackend()
         self.assertTrue(backend.use_ssl)
 
