@@ -14,7 +14,6 @@ from email.mime.message import MIMEMessage
 from email.header import Header
 from email.utils import formatdate, getaddresses, formataddr, parseaddr
 
-from django.conf import settings
 from django.core.mail.utils import DNS_NAME
 from django.utils.encoding import force_text
 from django.utils import six
@@ -207,12 +206,11 @@ class EmailMessage(object):
     """
     content_subtype = 'plain'
     mixed_subtype = 'mixed'
-    encoding = None     # None => use settings default
 
     @method_decorator(uses_settings({'DEFAULT_FROM_EMAIL': ['from_email', None],
-                                     'DEFAULT_CHARSET': ['encoding']}))
+                                     'DEFAULT_CHARSET': ['encoding', 'utf-8']}))
     def __init__(self, subject='', body='', from_email=None, to=None, bcc=None,
-                 connection=None, attachments=None, headers=None, cc=None, encoding=None):
+                 connection=None, attachments=None, headers=None, cc=None, encoding='utf-8'):
         """
         Initialize a single email message (which can be sent to multiple
         recipients).
@@ -251,7 +249,7 @@ class EmailMessage(object):
         return self.connection
 
     def message(self, encoding=None):
-        encoding = encoding or self.encoding or settings.DEFAULT_CHARSET
+        encoding = encoding or self.encoding
         msg = SafeMIMEText(self.body, self.content_subtype, encoding)
         msg = self._create_message(msg)
         msg['Subject'] = self.subject
@@ -315,7 +313,7 @@ class EmailMessage(object):
 
     def _create_attachments(self, msg):
         if self.attachments:
-            encoding = self.encoding or settings.DEFAULT_CHARSET
+            encoding = self.encoding
             body_msg = msg
             msg = SafeMIMEMultipart(_subtype=self.mixed_subtype, encoding=encoding)
             if self.body:
@@ -336,8 +334,7 @@ class EmailMessage(object):
         """
         basetype, subtype = mimetype.split('/', 1)
         if basetype == 'text':
-            encoding = self.encoding or settings.DEFAULT_CHARSET
-            attachment = SafeMIMEText(content, subtype, encoding)
+            attachment = SafeMIMEText(content, subtype, self.encoding)
         elif basetype == 'message' and subtype == 'rfc822':
             # Bug #18967: per RFC2046 s5.2.1, message/rfc822 attachments
             # must not be base64 encoded.
@@ -411,10 +408,9 @@ class EmailMultiAlternatives(EmailMessage):
         return self._create_attachments(self._create_alternatives(msg))
 
     def _create_alternatives(self, msg):
-        encoding = self.encoding or settings.DEFAULT_CHARSET
         if self.alternatives:
             body_msg = msg
-            msg = SafeMIMEMultipart(_subtype=self.alternative_subtype, encoding=encoding)
+            msg = SafeMIMEMultipart(_subtype=self.alternative_subtype, encoding=self.encoding)
             if self.body:
                 msg.attach(body_msg)
             for alternative in self.alternatives:
