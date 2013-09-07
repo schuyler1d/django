@@ -208,7 +208,7 @@ class override(object):
 
 # Templates
 
-@uses_settings('USE_TZ', 'use_tz', overwrite_default=None)
+@uses_settings('USE_TZ', 'use_tz', fallback_trigger_value=None)
 def template_localtime(value, use_tz=None):
     """
     Checks if value is a datetime and converts it to local time if necessary.
@@ -242,7 +242,7 @@ def localtime(value, timezone=None):
         value = timezone.normalize(value)
     return value
 
-@uses_settings('USE_TZ', 'use_tz', overwrite_default=None)
+@uses_settings('USE_TZ', 'use_tz', fallback_trigger_value=None)
 def now(use_tz=None):
     """
     Returns an aware or naive datetime.datetime, depending on settings.USE_TZ.
