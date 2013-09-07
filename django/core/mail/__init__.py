@@ -5,6 +5,7 @@ from __future__ import unicode_literals
 
 from django.conf import settings
 from django.utils.module_loading import import_by_path
+from django.utils.unsetting import use_setting
 
 # Imported for backwards compatibility, and for the sake
 # of a cleaner namespace. These symbols used to be in
@@ -17,7 +18,7 @@ from django.core.mail.message import (
     DEFAULT_ATTACHMENT_MIME_TYPE, make_msgid,
     BadHeaderError, forbid_multi_line_headers)
 
-
+@use_setting('EMAIL_BACKEND', 'backend', overwrite_default=None)
 def get_connection(backend=None, fail_silently=False, **kwds):
     """Load an email backend and return an instance of it.
 
@@ -26,7 +27,7 @@ def get_connection(backend=None, fail_silently=False, **kwds):
     Both fail_silently and other keyword arguments are used in the
     constructor of the backend.
     """
-    klass = import_by_path(backend or settings.EMAIL_BACKEND)
+    klass = import_by_path(backend)
     return klass(fail_silently=fail_silently, **kwds)
 
 
@@ -77,10 +78,12 @@ def send_mass_mail(datatuple, fail_silently=False, auth_user=None,
     return connection.send_messages(messages)
 
 
+@use_setting({'ADMINS': 'to',
+              'EMAIL_SUBJECT_PREFIX': 'subject_prefix'})
 def mail_admins(subject, message, fail_silently=False, connection=None,
-                html_message=None):
+                html_message=None, to=None, subject_prefix=''):
     """Sends a message to the admins, as defined by the ADMINS setting."""
-    if not settings.ADMINS:
+    if not to:
         return
     mail = EmailMultiAlternatives('%s%s' % (settings.EMAIL_SUBJECT_PREFIX, subject),
                 message, settings.SERVER_EMAIL, [a[1] for a in settings.ADMINS],
