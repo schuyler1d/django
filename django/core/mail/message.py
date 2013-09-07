@@ -18,7 +18,10 @@ from django.conf import settings
 from django.core.mail.utils import DNS_NAME
 from django.utils.encoding import force_text
 from django.utils import six
+from django.utils.decorators import method_decorator
+from django.utils.unsetting import uses_settings
 
+uses_settings_m = method_decorator(uses_settings)
 
 # Don't BASE64-encode UTF-8 messages so that we avoid unwanted attention from
 # some spam filters.
@@ -77,10 +80,9 @@ ADDRESS_HEADERS = set([
     'resent-bcc',
 ])
 
-
+@uses_settings('DEFAULT_CHARSET', 'encoding')
 def forbid_multi_line_headers(name, val, encoding):
     """Forbids multi-line headers, to prevent header injection."""
-    encoding = encoding or settings.DEFAULT_CHARSET
     val = force_text(val)
     if '\n' in val or '\r' in val:
         raise BadHeaderError("Header values can't contain newlines (got %r for header %r)" % (val, name))
@@ -207,6 +209,7 @@ class EmailMessage(object):
     mixed_subtype = 'mixed'
     encoding = None     # None => use settings default
 
+    #@method_decorator(uses_settings('DEFAULT_FROM_EMAIL', 'from_email', None))
     def __init__(self, subject='', body='', from_email=None, to=None, bcc=None,
                  connection=None, attachments=None, headers=None, cc=None):
         """

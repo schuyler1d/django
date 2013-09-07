@@ -1,8 +1,7 @@
-from functools import update_wrapper
+from functools import wraps, update_wrapper
 import inspect
 
 from django.conf import settings
-from django.utils import decorators
 
 """
 
@@ -28,10 +27,6 @@ class SettingDetails():
             self.index = arg_names.index(self.arg)
         except ValueError:
             self.index = None
-
-        if self.arg not in arg_names:
-            raise ValueError("Decorator keyword argument, "
-                             "%s, not in function spec." % self.arg)
 
     def __repr__(self):
         return str([self.arg, self.index, self.overwrite_default])
@@ -87,6 +82,4 @@ def uses_settings(setting_name_or_dict, kw_arg=None, overwrite_default=OVERWRITE
         update_wrapper(_wrapper, func)
         return _wrapper
     return _dec
-
-uses_settings_m = decorators.method_decorator(uses_settings)
 
