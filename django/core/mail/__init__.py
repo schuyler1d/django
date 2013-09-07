@@ -17,7 +17,7 @@ from django.core.mail.message import (
     DEFAULT_ATTACHMENT_MIME_TYPE, make_msgid,
     BadHeaderError, forbid_multi_line_headers)
 
-@uses_settings('EMAIL_BACKEND', 'backend', overwrite_default=None)
+@uses_settings('EMAIL_BACKEND', 'backend', fallback_trigger_value=None)
 def get_connection(backend=None, fail_silently=False, **kwds):
     """Load an email backend and return an instance of it.
 

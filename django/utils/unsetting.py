@@ -20,7 +20,7 @@ class SettingDetails():
                         if isinstance(setting_details, (list, tuple))
                         else [setting_details])
         self.arg = setting_list[0]
-        self.overwrite_default = (setting_list[1] 
+        self.fallback_trigger_value = (setting_list[1] 
                                   if len(setting_list) > 1
                                   else OVERWRITE_SENTINEL)
         try:
@@ -29,17 +29,17 @@ class SettingDetails():
             self.index = None
 
     def __repr__(self):
-        return str([self.arg, self.index, self.overwrite_default])
+        return str([self.arg, self.index, self.fallback_trigger_value])
 
 
-def uses_settings(setting_name_or_dict, kw_arg=None, overwrite_default=OVERWRITE_SENTINEL):
+def uses_settings(setting_name_or_dict, kw_arg=None, fallback_trigger_value=OVERWRITE_SENTINEL):
     """
     Decorator for functions
     :param setting_name_or_dict: setting attribute, e.g. 'USE_TZ'.  
                   Alternatively, you can send in a dict like {'USE_TZ': ['use_tz', None]}
-                  where the None value is an optionally set overwrite_default per setting key
+                  where the None value is an optionally set fallback_trigger_value per setting key
     :param kw_arg: function parameter that can be used instead of the setting
-    :param overwrite_default: In some cases, explicitly setting the parameter
+    :param fallback_trigger_value: In some cases, explicitly setting the parameter
                   should still use the settings attribute, especially when
                   there was an existing required parameter
     """
@@ -55,7 +55,7 @@ def uses_settings(setting_name_or_dict, kw_arg=None, overwrite_default=OVERWRITE
             if kw_arg is None:
                 raise TypeError("required kw_arg argument")
             setting_map[kw_arg] = SettingDetails(
-                setting_name_or_dict, [kw_arg, overwrite_default],
+                setting_name_or_dict, [kw_arg, fallback_trigger_value],
                 arg_names)
 
         def _wrapper(*args, **kwargs):
@@ -75,7 +75,7 @@ def uses_settings(setting_name_or_dict, kw_arg=None, overwrite_default=OVERWRITE
                             new_kwargs[arg] = kw_defaults[position]
 
                 if setting_map.has_key(arg) \
-                        and new_kwargs[arg] == setting_map[arg].overwrite_default:
+                        and new_kwargs[arg] == setting_map[arg].fallback_trigger_value:
                     new_kwargs[arg] = getattr(settings, setting_map[arg].setting)
 
             return func(**new_kwargs)
