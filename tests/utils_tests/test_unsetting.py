@@ -5,10 +5,12 @@ from django.utils.unsetting import use_setting
 class UnsettingTests(unittest.TestCase):
     def test_use_setting_dec(self):
         with override_settings(USE_TZ=True):
-            @use_setting('USE_TZ', 'use_tz')
+            @use_setting('USE_TZ', 'use_tz', fallback_case=None)
             def foo(use_tz=None):
                 return use_tz
             self.assertTrue(foo())
+            self.assertTrue(foo(use_tz=None))
+            self.assertTrue(foo(None))
             self.assertEqual(foo(1), 1)
             self.assertEqual(foo(use_tz=2), 2)
 

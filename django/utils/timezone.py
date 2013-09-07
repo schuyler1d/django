@@ -219,7 +219,6 @@ def template_localtime(value, use_tz=None):
 
     This function is designed for use by the template engine.
     """
-    print use_tz, settings.USE_TZ
     should_convert = (isinstance(value, datetime)
         and (settings.USE_TZ if use_tz is None else use_tz)#use_tz #sky
         and not is_naive(value)
@@ -244,7 +243,7 @@ def localtime(value, timezone=None):
         value = timezone.normalize(value)
     return value
 
-@use_setting('USE_TZ', 'use_tz')
+@use_setting('USE_TZ', 'use_tz', fallback_case=None)
 def now(use_tz=None):
     """
     Returns an aware or naive datetime.datetime, depending on settings.USE_TZ.

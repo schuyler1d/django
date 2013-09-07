@@ -6,24 +6,38 @@ so that Django core libraries can be imported without a settings file or initial
 
 """
 
-def use_setting(setting_name, kw_arg):
+def use_setting(setting_name, kw_arg, fallback_case='FAKE_VALUE'):
     """Decorator for functions
     """
     def _dec(func):
         kw_arg_index = inspect.getargspec(func)[0].index(kw_arg)
-        if kw_arg not in inspect.getargspec(func)[0]:
+        arg_names = inspect.getargspec(func).args
+        kw_defaults = inspect.getargspec(func).defaults
+        
+        if kw_arg not in arg_names:
             raise ValueError("Decorator keyword argument, %s, not in function spec." % kw_arg)
+        
         def _wrapper(*args, **kwargs):
-            if kw_arg not in kwargs and \
-                    hasattr(settings, setting_name):
-                setting_val = getattr(settings, setting_name)
-                if len(args) > kw_arg_index:
-                    args = list(args)
-                    print args
-                    args[kw_arg_index] = setting_val
-                    print args
-                else:
-                    kwargs[kw_arg] = setting_val
-            return func(*args, **kwargs)
+            new_kwargs = {}
+            
+            for counter, arg in enumerate(arg_names):
+                try:
+                    # First, see if it is set positionally...
+                    new_kwargs[arg] = args[counter]
+                except IndexError:
+                    # ...if not, maybe it's an explicit kwarg...
+                    try:
+                        # Otherwise, the kwarg is good enough for us.
+                        new_kwargs[arg] = kwargs[arg]
+                
+                    except KeyError:
+                        # ...nope - it must be a default.
+                        position = len(args) - counter
+                        new_kwargs[arg] = kw_defaults[position]
+            
+            if new_kwargs[arg] == fallback_case:
+                 new_kwargs[arg] = getattr(settings, setting_name)
+                        
+            return func(**new_kwargs)
         return _wrapper
     return _dec
