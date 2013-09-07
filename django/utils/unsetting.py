@@ -17,13 +17,17 @@ class SettingDetails():
                         if isinstance(setting_details, (list, tuple))
                         else [setting_details])
         self.arg = setting_list[0]
-        self.overwrite_default = setting_list[1:] or OVERWRITE_SENTINEL
+        self.overwrite_default = (setting_list[1] 
+                                  if len(setting_list) > 1
+                                  else OVERWRITE_SENTINEL)
         self.index = arg_names.index(self.arg)
 
         if self.arg not in arg_names:
             raise ValueError("Decorator keyword argument, "
                              "%s, not in function spec." % self.arg)
 
+    def __repr__(self):
+        return str([self.arg, self.index, self.overwrite_default])
 
 def use_setting(setting_name_or_dict, kw_arg=None, overwrite_default=OVERWRITE_SENTINEL):
     """
