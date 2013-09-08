@@ -55,19 +55,27 @@ def uses_settings(setting_name_or_dict, kw_arg=None, fallback_trigger_value=OVER
             setting_map[kw_arg] = SettingDetails(
                 setting_name_or_dict, [kw_arg, fallback_trigger_value],
                 arg_names)
+
         def _wrapper(*args, **kwargs):
             args = list(args)
+            touched = {}
             for counter, arg in enumerate(arg_names):
                 if not setting_map.has_key(arg):
                     continue
                 s = setting_map[arg]
-                if s.index < len(args):
+                touched[arg] = True
+                if s.index is not None and s.index < len(args):
                     if s.fallback_trigger_value == args[s.index]:
-                        args[s.index] = getattr(settings, s.setting)
-                elif not kwargs.has_key(arg) \
-                        or kwargs[arg] == s.fallback_trigger_value:
+                        args[s.index] = getattr(settings, s.setting, s.fallback_trigger_value)
+                elif (not kwargs.has_key(arg) \
+                        or kwargs[arg] == s.fallback_trigger_value) \
+                        and hasattr(settings, s.setting):
                     kwargs[arg] = getattr(settings, s.setting)
-            
+                
+            for s in setting_map.values():
+                if s.arg not in touched and s.arg not in kwargs:
+                    kwargs[s.arg] = getattr(settings, s.setting, None)
+
             return func(*args, **kwargs)
         update_wrapper(_wrapper, func)
         return _wrapper
