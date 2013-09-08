@@ -11,6 +11,7 @@ file or initialization.
 
 OVERWRITE_SENTINEL = 'FAKE_VALUE'
 
+
 class SettingDetails():
     def __init__(self, setting, setting_details, arg_names):
         self.setting = setting
@@ -27,7 +28,7 @@ class SettingDetails():
             self.index = None
 
     def __repr__(self):
-        return str([self.arg, self.index, self.fallback_trigger_value])
+        return str([self.setting, self.index, self.fallback_trigger_value])
 
 
 def uses_settings(setting_name_or_dict, kw_arg=None, fallback_trigger_value=OVERWRITE_SENTINEL):
@@ -44,7 +45,6 @@ def uses_settings(setting_name_or_dict, kw_arg=None, fallback_trigger_value=OVER
     def _dec(func):
         setting_map = {}
         arg_names = inspect.getargspec(func).args
-        kw_defaults = inspect.getargspec(func).defaults
         if isinstance(setting_name_or_dict, dict):
             for k,v in setting_name_or_dict.items():
                 details = SettingDetails(k, v, arg_names)
@@ -55,29 +55,20 @@ def uses_settings(setting_name_or_dict, kw_arg=None, fallback_trigger_value=OVER
             setting_map[kw_arg] = SettingDetails(
                 setting_name_or_dict, [kw_arg, fallback_trigger_value],
                 arg_names)
-
         def _wrapper(*args, **kwargs):
-            new_kwargs = kwargs.copy()
-            max_args_index = 1000
+            args = list(args)
             for counter, arg in enumerate(arg_names):
-                try:
-                    # First, see if it is set positionally...
-                    new_kwargs[arg] = args[counter]
-                    max_args_index = min(max_args_index, counter)
-                except IndexError:
-                    if not kwargs.has_key(arg):
-                        if arg in setting_map:
-                            new_kwargs[arg] = getattr(settings,
-                                                      setting_map[arg].setting)
-                        else:
-                            position = len(args) - counter
-                            new_kwargs[arg] = kw_defaults[position]
-
-                if setting_map.has_key(arg) \
-                        and new_kwargs[arg] == setting_map[arg].fallback_trigger_value:
-                    new_kwargs[arg] = getattr(settings, setting_map[arg].setting)
-
-            return func(*args[:max_args_index], **new_kwargs)
+                if not setting_map.has_key(arg):
+                    continue
+                s = setting_map[arg]
+                if s.index < len(args):
+                    if s.fallback_trigger_value == args[s.index]:
+                        args[s.index] = getattr(settings, s.setting)
+                elif not kwargs.has_key(arg) \
+                        or kwargs[arg] == s.fallback_trigger_value:
+                    kwargs[arg] = getattr(settings, s.setting)
+            
+            return func(*args, **kwargs)
         update_wrapper(_wrapper, func)
         return _wrapper
     return _dec

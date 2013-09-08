@@ -17,10 +17,8 @@ from email.utils import formatdate, getaddresses, formataddr, parseaddr
 from django.core.mail.utils import DNS_NAME
 from django.utils.encoding import force_text
 from django.utils import six
-from django.utils.decorators import method_decorator
 from django.utils.unsetting import uses_settings
 
-uses_settings_m = method_decorator(uses_settings)
 
 # Don't BASE64-encode UTF-8 messages so that we avoid unwanted attention from
 # some spam filters.
@@ -207,8 +205,8 @@ class EmailMessage(object):
     content_subtype = 'plain'
     mixed_subtype = 'mixed'
 
-    @method_decorator(uses_settings({'DEFAULT_FROM_EMAIL': ['from_email', None],
-                                     'DEFAULT_CHARSET': ['encoding', 'utf-8']}))
+    @uses_settings({'DEFAULT_FROM_EMAIL': ['from_email', None],
+                    'DEFAULT_CHARSET': ['encoding', None]})
     def __init__(self, subject='', body='', from_email=None, to=None, bcc=None,
                  connection=None, attachments=None, headers=None, cc=None, encoding='utf-8'):
         """

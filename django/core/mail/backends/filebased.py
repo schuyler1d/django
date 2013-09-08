@@ -7,13 +7,12 @@ from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 from django.core.mail.backends.console import EmailBackend as ConsoleEmailBackend
 from django.utils import six
-from django.utils.decorators import method_decorator
 from django.utils.unsetting import uses_settings
 
 
 class EmailBackend(ConsoleEmailBackend):
 
-    @method_decorator(uses_settings('EMAIL_FILE_PATH', 'file_path'))
+    @uses_settings('EMAIL_FILE_PATH', 'file_path')
     def __init__(self, *args, **kwargs):
         self._fname = None
         if 'file_path' in kwargs:
