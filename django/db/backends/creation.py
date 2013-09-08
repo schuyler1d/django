@@ -3,10 +3,10 @@ import sys
 import time
 import warnings
 
-from django.conf import settings
 from django.db.utils import load_backend
 from django.utils.encoding import force_bytes
 from django.utils.six.moves import input
+from django.utils.unsetting import uses_settings
 
 from .util import truncate_name
 
@@ -313,7 +313,10 @@ class BaseDatabaseCreation(object):
             ";",
         ]
 
-    def create_test_db(self, verbosity=1, autoclobber=False):
+    @uses_settings({'DATABASES': 'db_dict',
+                    'CACHES': 'cache_dict'})
+    def create_test_db(self, verbosity=1, autoclobber=False,
+                       db_dict=None, cache_dict=None):
         """
         Creates a test database, prompting the user for confirmation if the
         database already exists. Returns the name of the test database created.
@@ -330,10 +333,11 @@ class BaseDatabaseCreation(object):
             print("Creating test database for alias '%s'%s..." % (
                 self.connection.alias, test_db_repr))
 
-        self._create_test_db(verbosity, autoclobber)
+        self._create_test_db(verbosity, autoclobber, db_dict=db_dict)
 
         self.connection.close()
-        settings.DATABASES[self.connection.alias]["NAME"] = test_database_name
+        if db_dict:
+            db_dict[self.connection.alias]["NAME"] = test_database_name
         self.connection.settings_dict["NAME"] = test_database_name
 
         # Report migrate messages at one level lower than that requested.
@@ -358,11 +362,12 @@ class BaseDatabaseCreation(object):
 
         from django.core.cache import get_cache
         from django.core.cache.backends.db import BaseDatabaseCache
-        for cache_alias in settings.CACHES:
-            cache = get_cache(cache_alias)
-            if isinstance(cache, BaseDatabaseCache):
-                call_command('createcachetable', cache._table,
-                             database=self.connection.alias)
+        if cache_dict:
+            for cache_alias in cache_dict:
+                cache = get_cache(cache_alias)
+                if isinstance(cache, BaseDatabaseCache):
+                    call_command('createcachetable', cache._table,
+                                 database=self.connection.alias)
 
         # Get a cursor (even though we don't need one yet). This has
         # the side effect of initializing the test database.
@@ -381,7 +386,7 @@ class BaseDatabaseCreation(object):
             return self.connection.settings_dict['TEST_NAME']
         return TEST_DATABASE_PREFIX + self.connection.settings_dict['NAME']
 
-    def _create_test_db(self, verbosity, autoclobber):
+    def _create_test_db(self, verbosity, autoclobber, db_dict):
         """
         Internal implementation - creates the test db tables.
         """

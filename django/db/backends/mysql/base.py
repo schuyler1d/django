@@ -50,6 +50,7 @@ from django.utils.functional import cached_property
 from django.utils.safestring import SafeBytes, SafeText
 from django.utils import six
 from django.utils import timezone
+from django.utils.unsetting import uses_settings
 
 # Raise exceptions for database warnings if DEBUG is on
 if settings.DEBUG:
@@ -62,17 +63,19 @@ IntegrityError = Database.IntegrityError
 parse_datetime = conversions[FIELD_TYPE.DATETIME]
 
 
-def parse_datetime_with_timezone_support(value):
+@uses_settings('USE_TZ', 'use_tz')
+def parse_datetime_with_timezone_support(value, use_tz=False):
     dt = parse_datetime(value)
     # Confirm that dt is naive before overwriting its tzinfo.
-    if dt is not None and settings.USE_TZ and timezone.is_naive(dt):
+    if dt is not None and use_tz and timezone.is_naive(dt):
         dt = dt.replace(tzinfo=timezone.utc)
     return dt
 
 
-def adapt_datetime_with_timezone_support(value, conv):
+@uses_settings('USE_TZ', 'use_tz')
+def adapt_datetime_with_timezone_support(value, conv, use_tz=False):
     # Equivalent to DateTimeField.get_db_prep_value. Used only by raw SQL.
-    if settings.USE_TZ:
+    if use_tz:
         if timezone.is_naive(value):
             warnings.warn("MySQL received a naive datetime (%s)"
                           " while time zone support is active." % value,
@@ -239,8 +242,9 @@ class DatabaseOperations(BaseDatabaseOperations):
             sql = "CAST(DATE_FORMAT(%s, '%s') AS DATETIME)" % (field_name, format_str)
         return sql
 
-    def datetime_extract_sql(self, lookup_type, field_name, tzname):
-        if settings.USE_TZ:
+    @uses_settings('USE_TZ', 'use_tz')
+    def datetime_extract_sql(self, lookup_type, field_name, tzname, use_tz=False):
+        if use_tz:
             field_name = "CONVERT_TZ(%s, 'UTC', %%s)" % field_name
             params = [tzname]
         else:
@@ -254,8 +258,9 @@ class DatabaseOperations(BaseDatabaseOperations):
             sql = "EXTRACT(%s FROM %s)" % (lookup_type.upper(), field_name)
         return sql, params
 
-    def datetime_trunc_sql(self, lookup_type, field_name, tzname):
-        if settings.USE_TZ:
+    @uses_settings('USE_TZ', 'use_tz')
+    def datetime_trunc_sql(self, lookup_type, field_name, tzname, use_tz=False):
+        if use_tz:
             field_name = "CONVERT_TZ(%s, 'UTC', %%s)" % field_name
             params = [tzname]
         else:
@@ -351,13 +356,14 @@ class DatabaseOperations(BaseDatabaseOperations):
                              'value for AutoField.')
         return value
 
-    def value_to_db_datetime(self, value):
+    @uses_settings('USE_TZ', 'use_tz')
+    def value_to_db_datetime(self, value, use_tz=False):
         if value is None:
             return None
 
         # MySQL doesn't support tz-aware datetimes
         if timezone.is_aware(value):
-            if settings.USE_TZ:
+            if use_tz:
                 value = value.astimezone(timezone.utc).replace(tzinfo=None)
             else:
                 raise ValueError("MySQL backend does not support timezone-aware datetimes when USE_TZ is False.")
