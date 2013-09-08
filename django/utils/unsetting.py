@@ -9,8 +9,11 @@ libraries so that Django core libraries can be imported without a settings
 file or initialization.
 """
 
-OVERWRITE_SENTINEL = 'FAKE_VALUE'
+_OVERWRITE_SENTINEL = 'FAKE_VALUE'
+_NEVER_USE_SETTINGS = False
 
+def never_use_settings(nevermind=True):
+    _NEVER_USE_SETTINGS = nevermind
 
 class SettingDetails():
     def __init__(self, setting, setting_details, arg_names):
@@ -21,7 +24,7 @@ class SettingDetails():
         self.arg = setting_list[0]
         self.fallback_trigger_value = (setting_list[1] 
                                   if len(setting_list) > 1
-                                  else OVERWRITE_SENTINEL)
+                                  else _OVERWRITE_SENTINEL)
         try:
             self.index = arg_names.index(self.arg)
         except ValueError:
@@ -31,7 +34,7 @@ class SettingDetails():
         return str([self.setting, self.index, self.fallback_trigger_value])
 
 
-def uses_settings(setting_name_or_dict, kw_arg=None, fallback_trigger_value=OVERWRITE_SENTINEL):
+def uses_settings(setting_name_or_dict, kw_arg=None, fallback_trigger_value=_OVERWRITE_SENTINEL):
     """
     Decorator for functions
     :param setting_name_or_dict: setting attribute, e.g. 'USE_TZ'.  
@@ -43,6 +46,8 @@ def uses_settings(setting_name_or_dict, kw_arg=None, fallback_trigger_value=OVER
                   there was an existing required parameter
     """
     def _dec(func):
+        if _NEVER_USE_SETTINGS:
+            return func
         setting_map = {}
         arg_names = inspect.getargspec(func).args
         if isinstance(setting_name_or_dict, dict):
