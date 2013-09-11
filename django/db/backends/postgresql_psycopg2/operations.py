@@ -1,7 +1,7 @@
 from __future__ import unicode_literals
 
-from django.conf import settings
 from django.db.backends import BaseDatabaseOperations
+from django.utils.unsetting import uses_settings
 
 
 class DatabaseOperations(BaseDatabaseOperations):
@@ -37,8 +37,9 @@ class DatabaseOperations(BaseDatabaseOperations):
         # http://www.postgresql.org/docs/current/static/functions-datetime.html#FUNCTIONS-DATETIME-TRUNC
         return "DATE_TRUNC('%s', %s)" % (lookup_type, field_name)
 
+    @uses_settings('USE_TZ', 'tzname')
     def datetime_extract_sql(self, lookup_type, field_name, tzname):
-        if settings.USE_TZ:
+        if tzname:
             field_name = "%s AT TIME ZONE %%s" % field_name
             params = [tzname]
         else:

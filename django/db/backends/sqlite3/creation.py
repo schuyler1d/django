@@ -52,7 +52,7 @@ class DatabaseCreation(BaseDatabaseCreation):
             return test_database_name
         return ':memory:'
 
-    def _create_test_db(self, verbosity, autoclobber):
+    def _create_test_db(self, verbosity, autoclobber, db_dict=None):
         test_database_name = self._get_test_db_name()
         if test_database_name != ':memory:':
             # Erase the old test database

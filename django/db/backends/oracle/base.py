@@ -57,7 +57,7 @@ from django.db.backends.oracle.creation import DatabaseCreation
 from django.db.backends.oracle.introspection import DatabaseIntrospection
 from django.db.backends.oracle.schema import DatabaseSchemaEditor
 from django.utils.encoding import force_bytes, force_text
-
+from django.utils.unsetting import uses_settings
 
 DatabaseError = Database.DatabaseError
 IntegrityError = Database.IntegrityError
@@ -188,8 +188,9 @@ WHEN (new.%(col_name)s IS NULL)
         # on DATE values, even though they actually store the time part.
         return "CAST(%s AS TIMESTAMP)" % result
 
+    @uses_settings('USE_TZ', 'tzname')
     def datetime_extract_sql(self, lookup_type, field_name, tzname):
-        if settings.USE_TZ:
+        if tzname:
             field_name = self._convert_field_to_tz(field_name, tzname)
         if lookup_type == 'week_day':
             # TO_CHAR(field, 'D') returns an integer from 1-7, where 1=Sunday.
@@ -199,8 +200,9 @@ WHEN (new.%(col_name)s IS NULL)
             sql = "EXTRACT(%s FROM %s)" % (lookup_type.upper(), field_name)
         return sql, []
 
+    @uses_settings('USE_TZ', 'tzname')
     def datetime_trunc_sql(self, lookup_type, field_name, tzname):
-        if settings.USE_TZ:
+        if tzname:
             field_name = self._convert_field_to_tz(field_name, tzname)
         # http://docs.oracle.com/cd/B19306_01/server.102/b14200/functions230.htm#i1002084
         if lookup_type in ('year', 'month'):
@@ -423,13 +425,14 @@ WHEN (new.%(col_name)s IS NULL)
         else:
             return "TABLESPACE %s" % self.quote_name(tablespace)
 
-    def value_to_db_datetime(self, value):
+    @uses_settings('USE_TZ', 'use_tz')
+    def value_to_db_datetime(self, value, use_tz=False):
         if value is None:
             return None
 
         # Oracle doesn't support tz-aware datetimes
         if timezone.is_aware(value):
-            if settings.USE_TZ:
+            if use_tz:
                 value = value.astimezone(timezone.utc).replace(tzinfo=None)
             else:
                 raise ValueError("Oracle backend does not support timezone-aware datetimes when USE_TZ is False.")
@@ -455,14 +458,15 @@ WHEN (new.%(col_name)s IS NULL)
         second = '%s-12-31'
         return [first % value, second % value]
 
-    def year_lookup_bounds_for_datetime_field(self, value):
+    @uses_settings('USE_TZ', 'use_tz')
+    def year_lookup_bounds_for_datetime_field(self, value, use_tz=False):
         # The default implementation uses datetime objects for the bounds.
         # This must be overridden here, to use a formatted date (string) as
         # 'second' instead -- cx_Oracle chops the fraction-of-second part
         # off of datetime objects, leaving almost an entire second out of
         # the year under the default implementation.
         bounds = super(DatabaseOperations, self).year_lookup_bounds_for_datetime_field(value)
-        if settings.USE_TZ:
+        if use_tz:
             bounds = [b.astimezone(timezone.utc).replace(tzinfo=None) for b in bounds]
         return [b.isoformat(b' ') for b in bounds]
 
@@ -568,7 +572,8 @@ class DatabaseWrapper(BaseDatabaseWrapper):
         conn_string = convert_unicode(self._connect_string())
         return Database.connect(conn_string, **conn_params)
 
-    def init_connection_state(self):
+    @uses_settings('USE_TZ', 'use_tz')
+    def init_connection_state(self, use_tz=False):
         cursor = self.create_cursor()
         # Set the territory first. The territory overrides NLS_DATE_FORMAT
         # and NLS_TIMESTAMP_FORMAT to the territory default. When all of
@@ -582,7 +587,7 @@ class DatabaseWrapper(BaseDatabaseWrapper):
         cursor.execute(
             "ALTER SESSION SET NLS_DATE_FORMAT = 'YYYY-MM-DD HH24:MI:SS'"
             " NLS_TIMESTAMP_FORMAT = 'YYYY-MM-DD HH24:MI:SS.FF'"
-            + (" TIME_ZONE = 'UTC'" if settings.USE_TZ else ''))
+            + (" TIME_ZONE = 'UTC'" if use_tz else ''))
         cursor.close()
         if 'operators' not in self.__dict__:
             # Ticket #14149: Check whether our LIKE implementation will
@@ -689,7 +694,8 @@ class OracleParam(object):
     parameter when executing the query.
     """
 
-    def __init__(self, param, cursor, strings_only=False):
+    @uses_settings('USE_TZ', 'use_tz')
+    def __init__(self, param, cursor, strings_only=False, use_tz=False):
         # With raw SQL queries, datetimes can reach this function
         # without being converted by DateTimeField.get_db_prep_value.
         if settings.USE_TZ and isinstance(param, datetime.datetime):

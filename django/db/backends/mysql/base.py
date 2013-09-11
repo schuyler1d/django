@@ -35,7 +35,7 @@ try:
 except ImportError:
     pytz = None
 
-from django.conf import settings
+from django.conf import settings #used on load
 from django.db import utils
 from django.db.backends import (util, BaseDatabaseFeatures,
     BaseDatabaseOperations, BaseDatabaseWrapper)
@@ -242,9 +242,9 @@ class DatabaseOperations(BaseDatabaseOperations):
             sql = "CAST(DATE_FORMAT(%s, '%s') AS DATETIME)" % (field_name, format_str)
         return sql
 
-    @uses_settings('USE_TZ', 'use_tz')
-    def datetime_extract_sql(self, lookup_type, field_name, tzname, use_tz=False):
-        if use_tz:
+    @uses_settings('USE_TZ', 'tzname')
+    def datetime_extract_sql(self, lookup_type, field_name, tzname):
+        if tzname:
             field_name = "CONVERT_TZ(%s, 'UTC', %%s)" % field_name
             params = [tzname]
         else:
