@@ -81,7 +81,7 @@ ADDRESS_HEADERS = set([
 
 def forbid_multi_line_headers(name, val, encoding):
     """Forbids multi-line headers, to prevent header injection."""
-    encoding = encoding or settings.DEFAULT_CHARSET
+    encoding = encoding or settings.get_configured('DEFAULT_CHARSET', 'utf-8')
     val = force_text(val)
     if '\n' in val or '\r' in val:
         raise BadHeaderError("Header values can't contain newlines (got %r for header %r)" % (val, name))
@@ -231,7 +231,8 @@ class EmailMessage(object):
             self.bcc = list(bcc)
         else:
             self.bcc = []
-        self.from_email = from_email or settings.DEFAULT_FROM_EMAIL
+        self.from_email = from_email or settings.get_configured('DEFAULT_FROM_EMAIL',
+                                                               'webmaster@localhost')
         self.subject = subject
         self.body = body
         self.attachments = attachments or []
@@ -245,7 +246,7 @@ class EmailMessage(object):
         return self.connection
 
     def message(self):
-        encoding = self.encoding or settings.DEFAULT_CHARSET
+        encoding = self.encoding or settings.get_configured('DEFAULT_CHARSET', 'utf-8')
         msg = SafeMIMEText(self.body, self.content_subtype, encoding)
         msg = self._create_message(msg)
         msg['Subject'] = self.subject
@@ -310,7 +311,7 @@ class EmailMessage(object):
 
     def _create_attachments(self, msg):
         if self.attachments:
-            encoding = self.encoding or settings.DEFAULT_CHARSET
+            encoding = self.encoding or settings.get_configured('DEFAULT_CHARSET', 'utf-8')
             body_msg = msg
             msg = SafeMIMEMultipart(_subtype=self.mixed_subtype, encoding=encoding)
             if self.body:
@@ -331,7 +332,7 @@ class EmailMessage(object):
         """
         basetype, subtype = mimetype.split('/', 1)
         if basetype == 'text':
-            encoding = self.encoding or settings.DEFAULT_CHARSET
+            encoding = self.encoding or settings.get_configured('DEFAULT_CHARSET', 'utf-8')
             attachment = SafeMIMEText(content, subtype, encoding)
         elif basetype == 'message' and subtype == 'rfc822':
             # Bug #18967: per RFC2046 s5.2.1, message/rfc822 attachments
@@ -408,7 +409,7 @@ class EmailMultiAlternatives(EmailMessage):
         return self._create_attachments(self._create_alternatives(msg))
 
     def _create_alternatives(self, msg):
-        encoding = self.encoding or settings.DEFAULT_CHARSET
+        encoding = self.encoding or settings.get_configured('DEFAULT_CHARSET', 'utf-8')
         if self.alternatives:
             body_msg = msg
             msg = SafeMIMEMultipart(_subtype=self.alternative_subtype, encoding=encoding)

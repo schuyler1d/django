@@ -171,11 +171,11 @@ def get_default_timezone():
     """
     Returns the default time zone as a tzinfo instance.
 
-    This is the time zone defined by settings.TIME_ZONE.
+    This is the time zone defined by settings.TIME_ZONE or os.environ['TZ']
     """
     global _localtime
     if _localtime is None:
-        if isinstance(settings.TIME_ZONE, six.string_types) and pytz is not None:
+        if isinstance(settings.get_configured('TIME_ZONE', None), six.string_types) and pytz is not None:
             _localtime = pytz.timezone(settings.TIME_ZONE)
         else:
             # This relies on os.environ['TZ'] being set to settings.TIME_ZONE.
@@ -290,7 +290,7 @@ def template_localtime(value, use_tz=None):
     This function is designed for use by the template engine.
     """
     should_convert = (isinstance(value, datetime)
-        and (settings.USE_TZ if use_tz is None else use_tz)
+        and (use_tz or settings.get_configured('USE_TZ', None))
         and not is_naive(value)
         and getattr(value, 'convert_to_local_time', True))
     return localtime(value) if should_convert else value
@@ -320,7 +320,7 @@ def now():
     """
     Returns an aware or naive datetime.datetime, depending on settings.USE_TZ.
     """
-    if settings.USE_TZ:
+    if settings.get_configured('USE_TZ', False):
         # timeit shows that datetime.now(tz=utc) is 24% slower
         return datetime.utcnow().replace(tzinfo=utc)
     else:

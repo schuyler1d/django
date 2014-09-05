@@ -17,12 +17,16 @@ class EmailBackend(BaseEmailBackend):
                  use_tls=None, fail_silently=False, use_ssl=None, timeout=None,
                  **kwargs):
         super(EmailBackend, self).__init__(fail_silently=fail_silently)
-        self.host = host or settings.EMAIL_HOST
-        self.port = port or settings.EMAIL_PORT
-        self.username = settings.EMAIL_HOST_USER if username is None else username
-        self.password = settings.EMAIL_HOST_PASSWORD if password is None else password
-        self.use_tls = settings.EMAIL_USE_TLS if use_tls is None else use_tls
-        self.use_ssl = settings.EMAIL_USE_SSL if use_ssl is None else use_ssl
+        self.host = host or settings.get_configured('EMAIL_HOST', 'localhost')
+        self.port = port or settings.get_configured('EMAIL_PORT', 25)
+        self.username = username if username is not None \
+            else settings.get_configured('EMAIL_HOST_USER', '')
+        self.password = password if password is not None \
+            else settings.get_configured('EMAIL_HOST_PASSWORD', '')
+        self.use_tls = use_tls if use_tls is not None \
+            else settings.get_configured('EMAIL_USE_TLS', False)
+        self.use_ssl = use_ssl if use_ssl is not None \
+            else settings.get_configured('EMAIL_USE_SSL', False)
         self.timeout = timeout
         if self.use_ssl and self.use_tls:
             raise ValueError(

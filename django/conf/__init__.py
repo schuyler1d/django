@@ -67,6 +67,32 @@ class LazySettings(LazyObject):
         return self._wrapped is not empty
 
 
+    class RequiredArg(object):
+        def __init__(self, name=''):
+            self.name = name
+
+        def failme(self):
+            raise TypeError('missing required argument %s' % self.name)
+
+
+    def get_configured(self, name, defaultval=RequiredArg()):
+        """
+        Returns a setting value only if settings.configure() has been run,
+        else return the default value.  With no default value it will
+        raise a TypeError, implying that an explicit argument ir setting is necessary
+
+        Use this to make your core library independent of settings.configure()
+        running like a real python library.
+        """
+        if not self.configured:
+            if isinstance(defaultval, RequiredArg):
+                return defaultval.failme()
+            else:
+                return defaultval
+        else:
+            return getattr(self._wrapped, name)
+
+
 class BaseSettings(object):
     """
     Common logic for settings whether set by a module or by the user.
