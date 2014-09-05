@@ -31,7 +31,7 @@ __all__ = [
 
 DEFAULT_CACHE_ALIAS = 'default'
 
-if DEFAULT_CACHE_ALIAS not in settings.CACHES:
+if settings.configured and DEFAULT_CACHE_ALIAS not in settings.CACHES:
     raise ImproperlyConfigured("You must define a '%s' cache" % DEFAULT_CACHE_ALIAS)
 
 
@@ -66,7 +66,7 @@ def _create_cache(backend, **kwargs):
     try:
         # Try to get the CACHES entry for the given backend name first
         try:
-            conf = settings.CACHES[backend]
+            conf = settings.if_configured('CACHES', {})[backend]
         except KeyError:
             try:
                 # Trying to import the given backend, in case it's a dotted path
@@ -103,7 +103,8 @@ class CacheHandler(object):
         except AttributeError:
             self._caches.caches = {}
         except KeyError:
-            pass
+            if not settings.configured:
+                raise
 
         if alias not in settings.CACHES:
             raise InvalidCacheBackendError(
