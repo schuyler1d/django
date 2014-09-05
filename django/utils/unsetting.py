@@ -9,7 +9,7 @@ libraries so that Django core libraries can be imported without a settings
 file or initialization.
 """
 
-_OVERWRITE_SENTINEL = 'FAKE_VALUE'
+_OVERWRITE_SENTINEL = -997
 _NEVER_USE_SETTINGS = False
 
 def never_use_settings(nevermind=True):
@@ -22,16 +22,17 @@ class SettingDetails():
                         if isinstance(setting_details, (list, tuple))
                         else [setting_details])
         self.arg = setting_list[0]
-        self.fallback_trigger_value = (setting_list[1] 
-                                  if len(setting_list) > 1
-                                  else _OVERWRITE_SENTINEL)
+        self.fallback_trigger = (len(setting_list) > 1 and setting_list[1] !=  _OVERWRITE_SENTINEL)
+        if self.fallback_trigger:
+            self.fallback_trigger_value = setting_list[1]
+
         try:
             self.index = arg_names.index(self.arg)
         except ValueError:
             self.index = None
 
     def __repr__(self):
-        return str([self.setting, self.index, self.fallback_trigger_value])
+        return str([self.setting, self.index, getattr(self, 'fallback_trigger_value', 'no fallback')])
 
 
 def uses_settings(setting_name_or_dict, kw_arg=None, fallback_trigger_value=_OVERWRITE_SENTINEL):
@@ -100,38 +101,31 @@ def uses_settings(setting_name_or_dict, kw_arg=None, fallback_trigger_value=_OVE
     def _dec(func):
         if _NEVER_USE_SETTINGS:
             return func
-        setting_map = {}
+        setting_map = []
         arg_names = inspect.getargspec(func).args
         if isinstance(setting_name_or_dict, dict):
-            for k,v in setting_name_or_dict.items():
-                details = SettingDetails(k, v, arg_names)
-                setting_map[details.arg] = details
+            for setting_name, v in setting_name_or_dict.items():
+                details = SettingDetails(setting_name, v, arg_names)
+                setting_map.append(details)
         else: #it should be a string
             if kw_arg is None:
                 raise TypeError("required kw_arg argument")
-            setting_map[kw_arg] = SettingDetails(
-                setting_name_or_dict, [kw_arg, fallback_trigger_value],
-                arg_names)
+            setting_map.append(SettingDetails(
+                    setting_name_or_dict,
+                    [kw_arg, fallback_trigger_value],
+                    arg_names))
 
         def _wrapper(*args, **kwargs):
-            args = list(args)
-            touched = {}
-            for counter, arg in enumerate(arg_names):
-                if not setting_map.has_key(arg):
-                    continue
-                s = setting_map[arg]
-                touched[arg] = True
-                if s.index is not None and s.index < len(args):
-                    if s.fallback_trigger_value == args[s.index]:
+            args = list(args) #if tuple, make it writable
+            args_len = len(args)
+            for s in setting_map:
+                if s.index is not None and s.index < args_len:
+                    if s.fallback_trigger and s.fallback_trigger_value == args[s.index]:
                         args[s.index] = getattr(settings, s.setting, s.fallback_trigger_value)
-                elif (not kwargs.has_key(arg) \
-                        or kwargs[arg] == s.fallback_trigger_value) \
-                        and hasattr(settings, s.setting):
-                    kwargs[arg] = getattr(settings, s.setting)
-                
-            for s in setting_map.values():
-                if s.arg not in touched and s.arg not in kwargs:
-                    kwargs[s.arg] = getattr(settings, s.setting, None)
+                elif (not kwargs.has_key(s.arg) \
+                          or (s.fallback_trigger and kwargs[s.arg] == s.fallback_trigger_value)) \
+                          and hasattr(settings, s.setting):
+                    kwargs[s.arg] = getattr(settings, s.setting)
 
             return func(*args, **kwargs)
         update_wrapper(_wrapper, func)
