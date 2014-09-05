@@ -34,7 +34,7 @@ def get_connection(backend=None, fail_silently=False, **kwds):
     Both fail_silently and other keyword arguments are used in the
     constructor of the backend.
     """
-    klass = import_string(backend or settings.EMAIL_BACKEND)
+    klass = import_string(backend or settings.if_configured('EMAIL_BACKEND'))
     return klass(fail_silently=fail_silently, **kwds)
 
 
@@ -86,26 +86,49 @@ def send_mass_mail(datatuple, fail_silently=False, auth_user=None,
 
 
 def mail_admins(subject, message, fail_silently=False, connection=None,
-                html_message=None):
-    """Sends a message to the admins, as defined by the ADMINS setting."""
-    if not settings.ADMINS:
-        return
-    mail = EmailMultiAlternatives('%s%s' % (settings.EMAIL_SUBJECT_PREFIX, subject),
-                message, settings.SERVER_EMAIL, [a[1] for a in settings.ADMINS],
-                connection=connection)
+                html_message=None, to=None, server_email=None, subject_prefix=''):
+    """Sends a message to the admins, as defined by the 'to' argument or ADMINS setting."""
+    if not to:
+        if settings.configured:
+            if not settings.ADMINS:
+                return
+            else:
+                to = [a[1] for a in settings.ADMINS]
+        else:
+            raise TypeError('required "to" argument or set settings.ADMINS')
+
+    mail = EmailMultiAlternatives(
+        '%s%s' % (
+            (subject_prefix or settings.if_configured('EMAIL_SUBJECT_PREFIX', '')),
+            subject),
+        message,
+        (server_email or settings.if_configured('SERVER_EMAIL')),
+        to,
+        connection=connection)
     if html_message:
         mail.attach_alternative(html_message, 'text/html')
     mail.send(fail_silently=fail_silently)
 
 
 def mail_managers(subject, message, fail_silently=False, connection=None,
-                  html_message=None):
-    """Sends a message to the managers, as defined by the MANAGERS setting."""
-    if not settings.MANAGERS:
-        return
-    mail = EmailMultiAlternatives('%s%s' % (settings.EMAIL_SUBJECT_PREFIX, subject),
-                message, settings.SERVER_EMAIL, [a[1] for a in settings.MANAGERS],
-                connection=connection)
+                  html_message=None, to=None, server_email=None, subject_prefix=''):
+    """Sends a message to the managers, as defined by the 'to' argument or MANAGERS setting."""
+    if not to:
+        if settings.configured:
+            if not settings.MANAGERS:
+                return
+            else:
+                to = [a[1] for a in settings.MANAGERS]
+        else:
+            raise TypeError('required "to" argument or set settings.ADMINS')
+    mail = EmailMultiAlternatives(
+        '%s%s' % (
+            subject_prefix or settings.if_configured('EMAIL_SUBJECT_PREFIX'),
+            subject),
+        message,
+        server_email or settings.if_configured('SERVER_EMAIL'),
+        to,
+        connection=connection)
     if html_message:
         mail.attach_alternative(html_message, 'text/html')
     mail.send(fail_silently=fail_silently)
