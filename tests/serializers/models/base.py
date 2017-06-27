@@ -149,6 +149,13 @@ class BaseModel(models.Model):
     parent_data = models.IntegerField()
 
 
+class WithoutPK(models.Model):
+    name = models.CharField(max_length=20)
+
+    class Meta:
+        without_primary_key = True
+
+
 class ProxyBaseModel(BaseModel):
     class Meta:
         proxy = True

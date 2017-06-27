@@ -1076,6 +1076,16 @@ class ModelStateTests(SimpleTestCase):
         self.assertEqual([name for name, mgr in food_state.managers], ['food_mgr'])
         self.assertEqual(food_state.managers[0][1].args, ('a', 'b', 1, 2))
 
+    @isolate_apps('migrations')
+    def test_without_primary_key(self):
+        class WithoutPK(models.Model):
+            name = models.CharField(max_length=20)
+
+            class Meta:
+                app_label = "migrations"
+                without_primary_key = True
+        pass
+
     @isolate_apps('migrations', 'django.contrib.contenttypes')
     def test_order_with_respect_to_private_field(self):
         class PrivateFieldModel(models.Model):

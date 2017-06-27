@@ -280,6 +280,13 @@ class ExplicitPK(models.Model):
         return self.key
 
 
+class WithoutPK(models.Model):
+    name = models.CharField(max_length=20)
+
+    class Meta:
+        without_primary_key = True
+
+
 class Post(models.Model):
     title = models.CharField(max_length=50, unique_for_date='posted', blank=True)
     slug = models.CharField(max_length=50, unique_for_year='posted', blank=True)

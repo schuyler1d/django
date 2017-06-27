@@ -86,6 +86,14 @@ def return_None():
     return None
 
 
+class NoPrimaryKeyFakeField:
+    """Used for without_primary_key"""
+    serializable = False
+    auto_created = False
+    attname = 'pk'
+    editable = False
+
+
 @total_ordering
 class Field(RegisterLookupMixin):
     """Base class for all field types"""

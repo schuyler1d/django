@@ -293,6 +293,12 @@ class ModelBase(type):
                 else:
                     new_class.add_to_class(field.name, copy.deepcopy(field))
 
+        if base_meta and base_meta.without_primary_key:
+            def _get_pk_val(self, meta=None):
+                return None
+            new_class._get_pk_val = _get_pk_val
+            new_class.pk = property(_get_pk_val, new_class._set_pk_val)
+
         if base_meta and base_meta.abstract and not abstract:
             new_class._meta.indexes = [copy.deepcopy(idx) for idx in new_class._meta.indexes]
             # Set the name of _meta.indexes. This can't be done in
@@ -551,7 +557,8 @@ class Model(metaclass=ModelBase):
         return getattr(self, meta.pk.attname)
 
     def _set_pk_val(self, value):
-        return setattr(self, self._meta.pk.attname, value)
+        if not self._meta.without_primary_key:
+            setattr(self, self._meta.pk.attname, value)
 
     pk = property(_get_pk_val, _set_pk_val)
 
@@ -824,7 +831,7 @@ class Model(metaclass=ModelBase):
             if not pk_set:
                 fields = [f for f in fields if f is not meta.auto_field]
 
-            update_pk = meta.auto_field and not pk_set
+            update_pk = meta.auto_field and not meta.without_primary_key and not pk_set
             result = self._do_insert(cls._base_manager, using, fields, update_pk, raw)
             if update_pk:
                 setattr(self, meta.pk.attname, result)

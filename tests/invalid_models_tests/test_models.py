@@ -559,6 +559,10 @@ class OtherModelTests(SimpleTestCase):
         ]
         self.assertEqual(errors, expected)
 
+    def test_without_primary_key_with_one(self):
+        """if without_primary_key = True, we should fail when a field is marked primary_key"""
+        pass
+
     def test_ordering_non_iterable(self):
         class Model(models.Model):
             class Meta:

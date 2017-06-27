@@ -9,7 +9,7 @@ from django.conf import settings
 from django.core.exceptions import FieldDoesNotExist, ImproperlyConfigured
 from django.db import connections
 from django.db.models import Manager
-from django.db.models.fields import AutoField
+from django.db.models.fields import AutoField, NoPrimaryKeyFakeField
 from django.db.models.fields.proxy import OrderWrt
 from django.db.models.query_utils import PathInfo
 from django.utils.datastructures import ImmutableList, OrderedSet
@@ -34,7 +34,7 @@ DEFAULT_NAMES = (
     'auto_created', 'index_together', 'apps', 'default_permissions',
     'select_on_save', 'default_related_name', 'required_db_features',
     'required_db_vendor', 'base_manager_name', 'default_manager_name',
-    'indexes',
+    'indexes', 'without_primary_key',
 )
 
 
@@ -89,6 +89,7 @@ class Options:
         self.ordering = []
         self._ordering_clash = False
         self.indexes = []
+        self.without_primary_key = False
         self.unique_together = []
         self.index_together = []
         self.select_on_save = False
@@ -238,7 +239,7 @@ class Options:
                     raise ImproperlyConfigured(
                         'Add parent_link=True to %s.' % field,
                     )
-            else:
+            elif not self.without_primary_key:
                 auto = AutoField(verbose_name='ID', primary_key=True, auto_created=True)
                 model.add_to_class('id', auto)
 
@@ -289,6 +290,9 @@ class Options:
         self.pk = target._meta.pk
         self.proxy_for_model = target
         self.db_table = target._meta.db_table
+
+    def setup_without_pk(self):
+        self.pk = NoPrimaryKeyFakeField()
 
     def __repr__(self):
         return '<Options for %s>' % self.object_name
