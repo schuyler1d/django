@@ -21,7 +21,7 @@ from django.db.models.query_utils import (
     Q, check_rel_lookup_compatibility, refs_expression,
 )
 from django.db.models.sql.constants import (
-    INNER, LOUTER, ORDER_DIR, ORDER_PATTERN, QUERY_TERMS, SINGLE,
+    INNER, LOUTER, ORDER_DIR, ORDER_PATTERN, SINGLE,
 )
 from django.db.models.sql.datastructures import (
     BaseTable, Empty, EmptyResultSet, Join, MultiJoin,
@@ -113,7 +113,6 @@ class Query:
 
     alias_prefix = 'T'
     subq_aliases = frozenset([alias_prefix])
-    query_terms = QUERY_TERMS
 
     compiler = 'SQLCompiler'
 
@@ -756,7 +755,7 @@ class Query:
                 # Join type of 'alias' changed, so re-examine all aliases that
                 # refer to this one.
                 aliases.extend(
-                    join for join in self.alias_map.keys()
+                    join for join in self.alias_map
                     if self.alias_map[join].parent_alias == alias and join not in aliases
                 )
 
@@ -794,7 +793,7 @@ class Query:
         relabelling any references to them in select columns and the where
         clause.
         """
-        assert set(change_map.keys()).intersection(set(change_map.values())) == set()
+        assert set(change_map).intersection(set(change_map.values())) == set()
 
         # 1. Update references in "select" (normal columns plus aliases),
         # "group by" and "where".
@@ -895,27 +894,16 @@ class Query:
 
     def join(self, join, reuse=None):
         """
-        Return an alias for the join in 'connection', either reusing an
-        existing alias for that join or creating a new one. 'connection' is a
-        tuple (lhs, table, join_cols) where 'lhs' is either an existing
-        table alias or a table name. 'join_cols' is a tuple of tuples containing
-        columns to join on ((l_id1, r_id1), (l_id2, r_id2)). The join corresponds
-        to the SQL equivalent of::
+        Return an alias for the 'join', either reusing an existing alias for
+        that join or creating a new one. 'join' is either a
+        sql.datastructures.BaseTable or Join.
 
-            lhs.l_id1 = table.r_id1 AND lhs.l_id2 = table.r_id2
-
-        The 'reuse' parameter can be either None which means all joins
-        (matching the connection) are reusable, or it can be a set containing
-        the aliases that can be reused.
+        The 'reuse' parameter can be either None which means all joins are
+        reusable, or it can be a set containing the aliases that can be reused.
 
         A join is always created as LOUTER if the lhs alias is LOUTER to make
-        sure we do not generate chains like t1 LOUTER t2 INNER t3. All new
-        joins are created as LOUTER if nullable is True.
-
-        If 'nullable' is True, the join can potentially involve NULL values and
-        is a candidate for promotion (to "left outer") when combining querysets.
-
-        The 'join_field' is the field we are joining along (if any).
+        sure chains like t1 LOUTER t2 INNER t3 aren't generated. All new
+        joins are created as LOUTER if the join is nullable.
         """
         reuse = [a for a, j in self.alias_map.items()
                  if (reuse is None or a in reuse) and j == join]
@@ -1251,8 +1239,7 @@ class Query:
         # (Consider case where rel_a is LOUTER and rel_a__col=1 is added - if
         # rel_a doesn't produce any rows, then the whole condition must fail.
         # So, demotion is OK.
-        existing_inner = set(
-            (a for a in self.alias_map if self.alias_map[a].join_type == INNER))
+        existing_inner = {a for a in self.alias_map if self.alias_map[a].join_type == INNER}
         clause, _ = self._add_q(q_object, self.used_aliases)
         if clause:
             self.where.add(clause, AND)
@@ -1437,8 +1424,8 @@ class Query:
         for pos, info in enumerate(reversed(path)):
             if len(joins) == 1 or not info.direct:
                 break
-            join_targets = set(t.column for t in info.join_field.foreign_related_fields)
-            cur_targets = set(t.column for t in targets)
+            join_targets = {t.column for t in info.join_field.foreign_related_fields}
+            cur_targets = {t.column for t in targets}
             if not cur_targets.issubset(join_targets):
                 break
             targets_dict = {r[1].column: r[0] for r in info.join_field.related_fields if r[1].column in cur_targets}

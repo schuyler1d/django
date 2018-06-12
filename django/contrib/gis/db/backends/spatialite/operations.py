@@ -3,10 +3,9 @@ SQL functions reference lists:
 https://web.archive.org/web/20130407175746/https://www.gaia-gis.it/gaia-sins/spatialite-sql-4.0.0.html
 https://www.gaia-gis.it/gaia-sins/spatialite-sql-4.2.1.html
 """
-import re
-
-from django.contrib.gis.db.backends.base.operations import \
-    BaseSpatialOperations
+from django.contrib.gis.db.backends.base.operations import (
+    BaseSpatialOperations,
+)
 from django.contrib.gis.db.backends.spatialite.adapter import SpatiaLiteAdapter
 from django.contrib.gis.db.backends.utils import SpatialOperator
 from django.contrib.gis.db.models import aggregates
@@ -15,6 +14,7 @@ from django.contrib.gis.measure import Distance
 from django.core.exceptions import ImproperlyConfigured
 from django.db.backends.sqlite3.operations import DatabaseOperations
 from django.utils.functional import cached_property
+from django.utils.version import get_version_tuple
 
 
 class SpatiaLiteDistanceOperator(SpatialOperator):
@@ -34,7 +34,6 @@ class SpatiaLiteDistanceOperator(SpatialOperator):
 class SpatiaLiteOperations(BaseSpatialOperations, DatabaseOperations):
     name = 'spatialite'
     spatialite = True
-    version_regex = re.compile(r'^(?P<major>\d)\.(?P<minor1>\d)\.(?P<minor2>\d+)')
 
     Adapter = SpatiaLiteAdapter
 
@@ -188,16 +187,7 @@ class SpatiaLiteOperations(BaseSpatialOperations, DatabaseOperations):
         minor, subminor).
         """
         version = self.spatialite_version()
-
-        m = self.version_regex.match(version)
-        if m:
-            major = int(m.group('major'))
-            minor1 = int(m.group('minor1'))
-            minor2 = int(m.group('minor2'))
-        else:
-            raise Exception('Could not parse SpatiaLite version string: %s' % version)
-
-        return (version, major, minor1, minor2)
+        return (version,) + get_version_tuple(version)
 
     def spatial_aggregate_name(self, agg_name):
         """

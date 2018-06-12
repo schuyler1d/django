@@ -199,7 +199,7 @@ class Field(RegisterLookupMixin):
 
     def __repr__(self):
         """Display the module, class, and name of the field."""
-        path = '%s.%s' % (self.__class__.__module__, self.__class__.__name__)
+        path = '%s.%s' % (self.__class__.__module__, self.__class__.__qualname__)
         name = getattr(self, 'name', None)
         if name is not None:
             return '<%s: %s>' % (path, name)
@@ -456,7 +456,7 @@ class Field(RegisterLookupMixin):
                 if value is not default:
                     keywords[name] = value
         # Work out path - we shorten it for known Django core fields
-        path = "%s.%s" % (self.__class__.__module__, self.__class__.__name__)
+        path = "%s.%s" % (self.__class__.__module__, self.__class__.__qualname__)
         if path.startswith("django.db.models.fields.related"):
             path = path.replace("django.db.models.fields.related", "django.db.models")
         if path.startswith("django.db.models.fields.files"):
@@ -807,7 +807,7 @@ class Field(RegisterLookupMixin):
                    for x in rel_model._default_manager.complex_filter(
                        limit_choices_to)]
         else:
-            lst = [(x._get_pk_val(), smart_text(x))
+            lst = [(x.pk, smart_text(x))
                    for x in rel_model._default_manager.complex_filter(
                        limit_choices_to)]
         return first_choice + lst
@@ -2117,7 +2117,9 @@ class TextField(Field):
         # Passing max_length to forms.CharField means that the value's length
         # will be validated twice. This is considered acceptable since we want
         # the value in the form field (to pass into widget for example).
-        defaults = {'max_length': self.max_length, 'widget': forms.Textarea}
+        defaults = {'max_length': self.max_length}
+        if not self.choices:
+            defaults['widget'] = forms.Textarea
         defaults.update(kwargs)
         return super().formfield(**defaults)
 

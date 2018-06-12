@@ -248,8 +248,7 @@ class ModelFormMetaclass(DeclarativeFieldsMetaclass):
 
             # make sure opts.fields doesn't specify an invalid field
             none_model_fields = [k for k, v in fields.items() if not v]
-            missing_fields = (set(none_model_fields) -
-                              set(new_class.declared_fields.keys()))
+            missing_fields = set(none_model_fields) - set(new_class.declared_fields)
             if missing_fields:
                 message = 'Unknown field(s) (%s) specified for %s'
                 message = message % (', '.join(missing_fields),
@@ -317,7 +316,7 @@ class BaseModelForm(BaseForm):
 
             # Exclude fields that failed form validation. There's no need for
             # the model fields to validate them as well.
-            elif field in self._errors.keys():
+            elif field in self._errors:
                 exclude.append(f.name)
 
             # Exclude empty fields that are not required by the form, if the
@@ -1129,10 +1128,10 @@ class ModelChoiceField(ChoiceField):
     }
     iterator = ModelChoiceIterator
 
-    def __init__(self, queryset, empty_label="---------",
+    def __init__(self, queryset, *, empty_label="---------",
                  required=True, widget=None, label=None, initial=None,
                  help_text='', to_field_name=None, limit_choices_to=None,
-                 *args, **kwargs):
+                 **kwargs):
         if required and (initial is not None):
             self.empty_label = None
         else:
@@ -1140,8 +1139,10 @@ class ModelChoiceField(ChoiceField):
 
         # Call Field instead of ChoiceField __init__() because we don't need
         # ChoiceField.__init__().
-        Field.__init__(self, required, widget, label, initial, help_text,
-                       *args, **kwargs)
+        Field.__init__(
+            self, required=required, widget=widget, label=label,
+            initial=initial, help_text=help_text, **kwargs
+        )
         self.queryset = queryset
         self.limit_choices_to = limit_choices_to   # limit the queryset later.
         self.to_field_name = to_field_name
@@ -1237,12 +1238,8 @@ class ModelMultipleChoiceField(ModelChoiceField):
         'invalid_pk_value': _('"%(pk)s" is not a valid value.')
     }
 
-    def __init__(self, queryset, required=True, widget=None, label=None,
-                 initial=None, help_text='', *args, **kwargs):
-        super().__init__(
-            queryset, None, required, widget, label, initial, help_text,
-            *args, **kwargs
-        )
+    def __init__(self, queryset, **kwargs):
+        super().__init__(queryset, empty_label=None, **kwargs)
 
     def to_python(self, value):
         if not value:
@@ -1290,7 +1287,7 @@ class ModelMultipleChoiceField(ModelChoiceField):
                     params={'pk': pk},
                 )
         qs = self.queryset.filter(**{'%s__in' % key: value})
-        pks = set(str(getattr(o, key)) for o in qs)
+        pks = {str(getattr(o, key)) for o in qs}
         for val in value:
             if str(val) not in pks:
                 raise ValidationError(
@@ -1304,7 +1301,8 @@ class ModelMultipleChoiceField(ModelChoiceField):
         if (hasattr(value, '__iter__') and
                 not isinstance(value, str) and
                 not hasattr(value, '_meta')):
-            return [super(ModelMultipleChoiceField, self).prepare_value(v) for v in value]
+            prepare_value = super().prepare_value
+            return [prepare_value(v) for v in value]
         return super().prepare_value(value)
 
     def has_changed(self, initial, data):
@@ -1314,8 +1312,8 @@ class ModelMultipleChoiceField(ModelChoiceField):
             data = []
         if len(initial) != len(data):
             return True
-        initial_set = set(str(value) for value in self.prepare_value(initial))
-        data_set = set(str(value) for value in data)
+        initial_set = {str(value) for value in self.prepare_value(initial)}
+        data_set = {str(value) for value in data}
         return data_set != initial_set
 
 

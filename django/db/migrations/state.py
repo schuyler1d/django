@@ -224,7 +224,7 @@ class ProjectState:
         return cls(app_models)
 
     def __eq__(self, other):
-        if set(self.models.keys()) != set(other.models.keys()):
+        if set(self.models) != set(other.models):
             return False
         if set(self.real_apps) != set(other.real_apps):
             return False
@@ -559,7 +559,7 @@ class ModelState:
         # First, make a Meta object
         meta_contents = {'app_label': self.app_label, "apps": apps}
         meta_contents.update(self.options)
-        meta = type("Meta", tuple(), meta_contents)
+        meta = type("Meta", (), meta_contents)
         # Then, work out our bases
         try:
             bases = tuple(

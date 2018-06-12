@@ -118,6 +118,20 @@ def call_command(command_name, *args, **options):
     arg_options = {opt_mapping.get(key, key): value for key, value in options.items()}
     defaults = parser.parse_args(args=[force_text(a) for a in args])
     defaults = dict(defaults._get_kwargs(), **arg_options)
+    # Raise an error if any unknown options were passed.
+    stealth_options = set(command.base_stealth_options + command.stealth_options)
+    dest_parameters = {action.dest for action in parser._actions}
+    valid_options = dest_parameters | stealth_options | set(opt_mapping)
+    unknown_options = set(options) - valid_options
+    if unknown_options:
+        raise TypeError(
+            "Unknown option(s) for %s command: %s. "
+            "Valid options are: %s." % (
+                command_name,
+                ', '.join(sorted(unknown_options)),
+                ', '.join(sorted(valid_options)),
+            )
+        )
     # Move positional args out of options to mimic legacy optparse
     args = defaults.pop('args', ())
     if 'skip_checks' not in options:
@@ -138,7 +152,7 @@ class ManagementUtility:
     def main_help_text(self, commands_only=False):
         """Return the script's main help text, as a string."""
         if commands_only:
-            usage = sorted(get_commands().keys())
+            usage = sorted(get_commands())
         else:
             usage = [
                 "",
@@ -154,7 +168,7 @@ class ManagementUtility:
                     app = app.rpartition('.')[-1]
                 commands_dict[app].append(name)
             style = color_style()
-            for app in sorted(commands_dict.keys()):
+            for app in sorted(commands_dict):
                 usage.append("")
                 usage.append(style.NOTICE("[%s]" % app))
                 for name in sorted(commands_dict[app]):

@@ -4,14 +4,15 @@ from os import path
 
 from django.conf import settings
 from django.test import (
-    SimpleTestCase, TestCase, modify_settings, override_settings,
+    RequestFactory, SimpleTestCase, TestCase, modify_settings,
+    override_settings,
 )
 from django.test.selenium import SeleniumTestCase
 from django.urls import reverse
 from django.utils.translation import (
     LANGUAGE_SESSION_KEY, get_language, override,
 )
-from django.views.i18n import get_formats
+from django.views.i18n import JavaScriptCatalog, get_formats
 
 from ..urls import locale_dir
 
@@ -32,7 +33,7 @@ class SetLanguageTests(TestCase):
         The user is redirected to the 'next' argument if provided.
         """
         lang_code = self._get_inactive_language_code()
-        post_data = dict(language=lang_code, next='/')
+        post_data = {'language': lang_code, 'next': '/'}
         response = self.client.post('/i18n/setlang/', post_data, HTTP_REFERER='/i_should_not_be_used/')
         self.assertRedirects(response, '/')
         self.assertEqual(self.client.session[LANGUAGE_SESSION_KEY], lang_code)
@@ -43,7 +44,7 @@ class SetLanguageTests(TestCase):
         "safe".
         """
         lang_code = self._get_inactive_language_code()
-        post_data = dict(language=lang_code, next='//unsafe/redirection/')
+        post_data = {'language': lang_code, 'next': '//unsafe/redirection/'}
         response = self.client.post('/i18n/setlang/', data=post_data)
         self.assertEqual(response.url, '/')
         self.assertEqual(self.client.session[LANGUAGE_SESSION_KEY], lang_code)
@@ -55,7 +56,7 @@ class SetLanguageTests(TestCase):
         """
         lang_code = self._get_inactive_language_code()
         non_https_next_url = 'http://testserver/redirection/'
-        post_data = dict(language=lang_code, next=non_https_next_url)
+        post_data = {'language': lang_code, 'next': non_https_next_url}
         # Insecure URL in POST data.
         response = self.client.post('/i18n/setlang/', data=post_data, secure=True)
         self.assertEqual(response.url, '/')
@@ -71,7 +72,7 @@ class SetLanguageTests(TestCase):
         there isn't a "next" parameter.
         """
         lang_code = self._get_inactive_language_code()
-        post_data = dict(language=lang_code)
+        post_data = {'language': lang_code}
         response = self.client.post('/i18n/setlang/', post_data, HTTP_REFERER='/i18n/')
         self.assertRedirects(response, '/i18n/', fetch_redirect_response=False)
         self.assertEqual(self.client.session[LANGUAGE_SESSION_KEY], lang_code)
@@ -82,7 +83,7 @@ class SetLanguageTests(TestCase):
         "next" parameter.
         """
         lang_code = self._get_inactive_language_code()
-        post_data = dict(language=lang_code)
+        post_data = {'language': lang_code}
         response = self.client.post('/i18n/setlang/', post_data)
         self.assertRedirects(response, '/')
         self.assertEqual(self.client.session[LANGUAGE_SESSION_KEY], lang_code)
@@ -92,7 +93,7 @@ class SetLanguageTests(TestCase):
         The set_language view redirects to the "next" parameter for AJAX calls.
         """
         lang_code = self._get_inactive_language_code()
-        post_data = dict(language=lang_code, next='/')
+        post_data = {'language': lang_code, 'next': '/'}
         response = self.client.post('/i18n/setlang/', post_data, HTTP_X_REQUESTED_WITH='XMLHttpRequest')
         self.assertRedirects(response, '/')
         self.assertEqual(self.client.session[LANGUAGE_SESSION_KEY], lang_code)
@@ -103,7 +104,7 @@ class SetLanguageTests(TestCase):
         AJAX calls.
         """
         lang_code = self._get_inactive_language_code()
-        post_data = dict(language=lang_code)
+        post_data = {'language': lang_code}
         headers = {'HTTP_REFERER': '/', 'HTTP_X_REQUESTED_WITH': 'XMLHttpRequest'}
         response = self.client.post('/i18n/setlang/', post_data, **headers)
         self.assertEqual(response.status_code, 204)
@@ -114,7 +115,7 @@ class SetLanguageTests(TestCase):
         The set_language view returns 204 for AJAX calls by default.
         """
         lang_code = self._get_inactive_language_code()
-        post_data = dict(language=lang_code)
+        post_data = {'language': lang_code}
         response = self.client.post('/i18n/setlang/', post_data, HTTP_X_REQUESTED_WITH='XMLHttpRequest')
         self.assertEqual(response.status_code, 204)
         self.assertEqual(self.client.session[LANGUAGE_SESSION_KEY], lang_code)
@@ -124,7 +125,7 @@ class SetLanguageTests(TestCase):
         The fallback to root URL for the set_language view works for AJAX calls.
         """
         lang_code = self._get_inactive_language_code()
-        post_data = dict(language=lang_code, next='//unsafe/redirection/')
+        post_data = {'language': lang_code, 'next': '//unsafe/redirection/'}
         response = self.client.post('/i18n/setlang/', post_data, HTTP_X_REQUESTED_WITH='XMLHttpRequest')
         self.assertEqual(response.url, '/')
         self.assertEqual(self.client.session[LANGUAGE_SESSION_KEY], lang_code)
@@ -143,7 +144,7 @@ class SetLanguageTests(TestCase):
             'LANGUAGE_COOKIE_PATH': '/test/',
         }
         with self.settings(**test_settings):
-            post_data = dict(language='pl', next='/views/')
+            post_data = {'language': 'pl', 'next': '/views/'}
             response = self.client.post('/i18n/setlang/', data=post_data)
             language_cookie = response.cookies.get('mylanguage')
             self.assertEqual(language_cookie.value, 'pl')
@@ -272,13 +273,27 @@ class I18NViewTests(SimpleTestCase):
     def test_i18n_fallback_language_plural(self):
         """
         The fallback to a language with less plural forms maintains the real
-        language's number of plural forms.
+        language's number of plural forms and correct translations.
         """
         with self.settings(LANGUAGE_CODE='pt'), override('ru'):
             response = self.client.get('/jsi18n/')
             self.assertEqual(
                 response.context['catalog']['{count} plural3'],
-                ['{count} plural3', '{count} plural3s', '{count} plural3 p3t']
+                ['{count} plural3 p3', '{count} plural3 p3s', '{count} plural3 p3t']
+            )
+            self.assertEqual(
+                response.context['catalog']['{count} plural2'],
+                ['{count} plural2', '{count} plural2s', '']
+            )
+        with self.settings(LANGUAGE_CODE='ru'), override('pt'):
+            response = self.client.get('/jsi18n/')
+            self.assertEqual(
+                response.context['catalog']['{count} plural3'],
+                ['{count} plural3', '{count} plural3s']
+            )
+            self.assertEqual(
+                response.context['catalog']['{count} plural2'],
+                ['{count} plural2', '{count} plural2s']
             )
 
     def test_i18n_english_variant(self):
@@ -382,6 +397,16 @@ class I18NViewTests(SimpleTestCase):
             with override('es-ar'):
                 response = self.client.get('/jsi18n/')
                 self.assertContains(response, 'este texto de app3 debe ser traducido')
+
+    def test_i18n_unknown_package_error(self):
+        view = JavaScriptCatalog.as_view()
+        request = RequestFactory().get('/')
+        msg = 'Invalid package(s) provided to JavaScriptCatalog: unknown_package'
+        with self.assertRaisesMessage(ValueError, msg):
+            view(request, packages='unknown_package')
+        msg += ',unknown_package2'
+        with self.assertRaisesMessage(ValueError, msg):
+            view(request, packages='unknown_package+unknown_package2')
 
 
 @override_settings(ROOT_URLCONF='view_tests.urls')

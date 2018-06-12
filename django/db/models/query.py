@@ -20,7 +20,7 @@ from django.db.models.expressions import F
 from django.db.models.fields import AutoField
 from django.db.models.functions import Trunc
 from django.db.models.query_utils import InvalidQuery, Q
-from django.db.models.sql.constants import CURSOR
+from django.db.models.sql.constants import CURSOR, GET_ITERATOR_CHUNK_SIZE
 from django.utils import timezone
 from django.utils.functional import cached_property, partition
 from django.utils.version import get_version
@@ -33,9 +33,10 @@ EmptyResultSet = sql.EmptyResultSet
 
 
 class BaseIterable:
-    def __init__(self, queryset, chunked_fetch=False):
+    def __init__(self, queryset, chunked_fetch=False, chunk_size=GET_ITERATOR_CHUNK_SIZE):
         self.queryset = queryset
         self.chunked_fetch = chunked_fetch
+        self.chunk_size = chunk_size
 
 
 class ModelIterable(BaseIterable):
@@ -47,7 +48,7 @@ class ModelIterable(BaseIterable):
         compiler = queryset.query.get_compiler(using=db)
         # Execute the query. This will also fill compiler.select, klass_info,
         # and annotations.
-        results = compiler.execute_sql(chunked_fetch=self.chunked_fetch)
+        results = compiler.execute_sql(chunked_fetch=self.chunked_fetch, chunk_size=self.chunk_size)
         select, klass_info, annotation_col_map = (compiler.select, compiler.klass_info,
                                                   compiler.annotation_col_map)
         model_cls = klass_info['model']
@@ -301,13 +302,15 @@ class QuerySet:
     # METHODS THAT DO DATABASE QUERIES #
     ####################################
 
-    def iterator(self):
+    def iterator(self, chunk_size=2000):
         """
         An iterator over the results from applying this QuerySet to the
         database.
         """
+        if chunk_size <= 0:
+            raise ValueError('Chunk size must be strictly positive.')
         use_chunked_fetch = not connections[self.db].settings_dict.get('DISABLE_SERVER_SIDE_CURSORS')
-        return iter(self._iterable_class(self, chunked_fetch=use_chunked_fetch))
+        return iter(self._iterable_class(self, chunked_fetch=use_chunked_fetch, chunk_size=chunk_size))
 
     def aggregate(self, *args, **kwargs):
         """
@@ -334,7 +337,7 @@ class QuerySet:
             query.add_annotation(aggregate_expr, alias, is_summary=True)
             if not query.annotations[alias].contains_aggregate:
                 raise TypeError("%s is not an aggregate expression" % alias)
-        return query.get_aggregation(self.db, kwargs.keys())
+        return query.get_aggregation(self.db, kwargs)
 
     def count(self):
         """
@@ -504,12 +507,14 @@ class QuerySet:
                 lookup[f.name] = lookup.pop(f.attname)
         params = {k: v for k, v in kwargs.items() if LOOKUP_SEP not in k}
         params.update(defaults)
+        property_names = self.model._meta._property_names
         invalid_params = []
         for param in params:
             try:
                 self.model._meta.get_field(param)
             except exceptions.FieldDoesNotExist:
-                if param != 'pk':  # It's okay to use a model's pk property.
+                # It's okay to use a model's property if it has a setter.
+                if not (param in property_names and getattr(self.model, param).fset):
                     invalid_params.append(param)
         if invalid_params:
             raise exceptions.FieldError(
@@ -578,7 +583,7 @@ class QuerySet:
                 qs = self.filter(pk__in=id_list).order_by()
         else:
             qs = self._clone()
-        return {obj._get_pk_val(): obj for obj in qs}
+        return {obj.pk: obj for obj in qs}
 
     def delete(self):
         """Delete the records in the current QuerySet."""
@@ -813,12 +818,25 @@ class QuerySet:
         return clone
 
     def union(self, *other_qs, all=False):
+        # If the query is an EmptyQuerySet, combine all nonempty querysets.
+        if isinstance(self, EmptyQuerySet):
+            qs = [q for q in other_qs if not isinstance(q, EmptyQuerySet)]
+            return qs[0]._combinator_query('union', *qs[1:], all=all) if qs else self
         return self._combinator_query('union', *other_qs, all=all)
 
     def intersection(self, *other_qs):
+        # If any query is an EmptyQuerySet, return it.
+        if isinstance(self, EmptyQuerySet):
+            return self
+        for other in other_qs:
+            if isinstance(other, EmptyQuerySet):
+                return other
         return self._combinator_query('intersection', *other_qs)
 
     def difference(self, *other_qs):
+        # If the query is an EmptyQuerySet, return it.
+        if isinstance(self, EmptyQuerySet):
+            return self
         return self._combinator_query('difference', *other_qs)
 
     def select_for_update(self, nowait=False, skip_locked=False):
@@ -942,6 +960,8 @@ class QuerySet:
 
     def reverse(self):
         """Reverse the ordering of the QuerySet."""
+        if not self.query.can_filter():
+            raise TypeError('Cannot reverse a query once a slice has been taken.')
         clone = self._clone()
         clone.query.standard_ordering = not clone.query.standard_ordering
         return clone
@@ -1280,8 +1300,8 @@ class Prefetch:
         return obj_dict
 
     def add_prefix(self, prefix):
-        self.prefetch_through = LOOKUP_SEP.join([prefix, self.prefetch_through])
-        self.prefetch_to = LOOKUP_SEP.join([prefix, self.prefetch_to])
+        self.prefetch_through = prefix + LOOKUP_SEP + self.prefetch_through
+        self.prefetch_to = prefix + LOOKUP_SEP + self.prefetch_to
 
     def get_current_prefetch_to(self, level):
         return LOOKUP_SEP.join(self.prefetch_to.split(LOOKUP_SEP)[:level + 1])
