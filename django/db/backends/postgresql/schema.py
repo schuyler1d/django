@@ -20,6 +20,8 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
     # dropping it in the same transaction.
     sql_delete_fk = "SET CONSTRAINTS %(name)s IMMEDIATE; ALTER TABLE %(table)s DROP CONSTRAINT %(name)s"
 
+    sql_delete_procedure = 'DROP FUNCTION %(procedure)s(%(param_types)s)'
+
     def quote_value(self, value):
         return psycopg2.extensions.adapt(value)
 
@@ -105,11 +107,12 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
 
     def _alter_field(self, model, old_field, new_field, old_type, new_type,
                      old_db_params, new_db_params, strict=False):
-        # Drop indexes on varchar/text columns that are changing to a different
-        # type.
+        # Drop indexes on varchar/text/citext columns that are changing to a
+        # different type.
         if (old_field.db_index or old_field.unique) and (
             (old_type.startswith('varchar') and not new_type.startswith('varchar')) or
-            (old_type.startswith('text') and not new_type.startswith('text'))
+            (old_type.startswith('text') and not new_type.startswith('text')) or
+            (old_type.startswith('citext') and not new_type.startswith('citext'))
         ):
             index_name = self._create_index_name(model._meta.db_table, [old_field.column], suffix='_like')
             self.execute(self._delete_constraint_sql(self.sql_delete_index, model, index_name))
